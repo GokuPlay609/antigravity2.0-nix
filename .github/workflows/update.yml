@@ -1,0 +1,95 @@
+name: Update packages
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # daily at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: Fetch CLI manifests and compute hashes
+        id: update
+        run: |
+          set -euo pipefail
+          MANIFEST_BASE="https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests"
+
+          M_X64=$(curl -fsSL "$MANIFEST_BASE/linux_amd64.json")
+          VERSION=$(echo "$M_X64" | jq -r '.version')
+          URL_X64=$(echo "$M_X64" | jq -r '.url')
+          HASH_X64=$(nix store prefetch-file --json "$URL_X64" 2>/dev/null | jq -r '.hash')
+
+          M_ARM=$(curl -fsSL "$MANIFEST_BASE/linux_arm64.json")
+          URL_ARM=$(echo "$M_ARM" | jq -r '.url')
+          HASH_ARM=$(nix store prefetch-file --json "$URL_ARM" 2>/dev/null | jq -r '.hash')
+
+          echo "version=$VERSION"   >> "$GITHUB_OUTPUT"
+          echo "url_x64=$URL_X64"   >> "$GITHUB_OUTPUT"
+          echo "hash_x64=$HASH_X64" >> "$GITHUB_OUTPUT"
+          echo "url_arm=$URL_ARM"   >> "$GITHUB_OUTPUT"
+          echo "hash_arm=$HASH_ARM" >> "$GITHUB_OUTPUT"
+
+      - name: Patch flake.nix
+        run: |
+          python3 - <<'EOF'
+          import re, os
+
+          with open("flake.nix") as f:
+              content = f.read()
+
+          version  = os.environ["VERSION"]
+          url_x64  = os.environ["URL_X64"]
+          hash_x64 = os.environ["HASH_X64"]
+          url_arm  = os.environ["URL_ARM"]
+          hash_arm = os.environ["HASH_ARM"]
+
+          content = re.sub(
+              r'(pname = "antigravity-cli";\s+version = ")[^"]+(")',
+              rf'\g<1>{version}\2', content)
+          content = re.sub(
+              r'(x86_64-linux = \{\s+url = ")[^"]+(";\s+hash = ")[^"]+(")',
+              rf'\g<1>{url_x64}\2{hash_x64}\3', content)
+          content = re.sub(
+              r'(aarch64-linux = \{\s+url = ")[^"]+(";\s+hash = ")[^"]+(")',
+              rf'\g<1>{url_arm}\2{hash_arm}\3', content)
+
+          with open("flake.nix", "w") as f:
+              f.write(content)
+          print(f"Updated CLI to {version}")
+          EOF
+        env:
+          VERSION:  ${{ steps.update.outputs.version }}
+          URL_X64:  ${{ steps.update.outputs.url_x64 }}
+          HASH_X64: ${{ steps.update.outputs.hash_x64 }}
+          URL_ARM:  ${{ steps.update.outputs.url_arm }}
+          HASH_ARM: ${{ steps.update.outputs.hash_arm }}
+
+      - name: Update flake.lock
+        run: nix flake update
+
+      - name: Open PR if anything changed
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore: update antigravity-cli to ${{ steps.update.outputs.version }}"
+          title: "chore: update antigravity-cli to ${{ steps.update.outputs.version }}"
+          body: |
+            Automated version bump for `antigravity-cli`.
+
+            | | Value |
+            |---|---|
+            | **Version** | `${{ steps.update.outputs.version }}` |
+            | **x86_64 URL** | `${{ steps.update.outputs.url_x64 }}` |
+            | **aarch64 URL** | `${{ steps.update.outputs.url_arm }}` |
+          branch: "auto-update/cli-${{ steps.update.outputs.version }}"
+          delete-branch: true

@@ -1,10 +1,16 @@
 # antigravity2.0-nix
 
+[![CI](https://github.com/briossant/antigravity2.0-nix/actions/workflows/ci.yml/badge.svg)](https://github.com/briossant/antigravity2.0-nix/actions/workflows/ci.yml)
+[![Auto-update](https://github.com/briossant/antigravity2.0-nix/actions/workflows/update.yml/badge.svg)](https://github.com/briossant/antigravity2.0-nix/actions/workflows/update.yml)
+![CLI version](https://img.shields.io/badge/agy-1.0.0-blue)
+![Desktop version](https://img.shields.io/badge/antigravity-2.0.0-blue)
+![License](https://img.shields.io/github/license/briossant/antigravity2.0-nix)
+
 Nix flake for **Google Antigravity 2.0** — the agent-first development platform announced at Google I/O 2026.
 
-Packages both the **desktop app** (Antigravity Hub) and the **CLI** (`agy`), which are not yet available in nixpkgs.
+Packages both the **desktop app** and the **CLI** (`agy`), which are not available in nixpkgs (the existing `antigravity` package in nixpkgs is the old v1.x IDE, which is a completely different product).
 
-> **Note:** This flake targets Antigravity 2.0, a complete redesign of the product. It is unrelated to the `antigravity` package currently in nixpkgs (which packages the older IDE-based v1.x).
+> The CLI auto-updates daily via GitHub Actions.
 
 ---
 
@@ -13,28 +19,23 @@ Packages both the **desktop app** (Antigravity Hub) and the **CLI** (`agy`), whi
 | Attribute | Binary | Description | Architectures |
 |---|---|---|---|
 | `antigravity-cli` | `agy` | Terminal-first AI coding agent | `x86_64-linux` `aarch64-linux` |
-| `antigravity-desktop` | `antigravity` | Antigravity 2.0 desktop app (Electron) | `x86_64-linux` |
+| `antigravity-desktop` | `antigravity` | Antigravity 2.0 desktop app | `x86_64-linux` |
 | `default` | `agy` | Alias for `antigravity-cli` | `x86_64-linux` `aarch64-linux` |
 
-> ARM64 support for the desktop app is on Google's roadmap. The CLI already supports aarch64.
+> ARM64 for the desktop app is on Google's roadmap.
 
 ---
 
 ## Usage
 
-### Standalone (try without installing)
+### Quick try (no install)
 
 ```bash
-# Run the CLI
 nix run github:briossant/antigravity2.0-nix#antigravity-cli
-
-# Run the desktop app
 nix run github:briossant/antigravity2.0-nix#antigravity-desktop
 ```
 
-### NixOS / Home Manager
-
-Add the flake as an input:
+### Flake input
 
 ```nix
 # flake.nix
@@ -44,17 +45,51 @@ inputs = {
 };
 ```
 
-Then use the packages in your config:
+### Home Manager module
+
+The easiest way to install both tools declaratively:
 
 ```nix
-# In a NixOS module or home-manager module
-{ inputs, pkgs, system, ... }:
-{
-  home.packages = [
-    inputs.antigravity2.packages.${system}.antigravity-cli
-    inputs.antigravity2.packages.${system}.antigravity-desktop
-  ];
+# flake.nix
+inputs.antigravity2.url = "github:briossant/antigravity2.0-nix";
+
+# home-manager config
+{ inputs, ... }: {
+  imports = [ inputs.antigravity2.homeManagerModules.default ];
+
+  programs.antigravity = {
+    enable = true;
+    cli.enable = true;     # installs agy
+    desktop.enable = true; # installs antigravity (x86_64 only)
+  };
 }
+```
+
+### NixOS module
+
+Handles gnome-keyring setup so both tools remember your login across sessions:
+
+```nix
+# flake.nix
+inputs.antigravity2.url = "github:briossant/antigravity2.0-nix";
+
+# NixOS config
+{ inputs, ... }: {
+  imports = [ inputs.antigravity2.nixosModules.default ];
+
+  programs.antigravity = {
+    enable = true;
+    displayManager = "lightdm"; # or "gdm", "sddm" — default: lightdm
+  };
+}
+```
+
+### Overlay
+
+To get `pkgs.antigravity-cli` and `pkgs.antigravity-desktop` in your nixpkgs:
+
+```nix
+nixpkgs.overlays = [ inputs.antigravity2.overlays.default ];
 ```
 
 ### nix profile (imperative)
@@ -66,22 +101,22 @@ nix profile install github:briossant/antigravity2.0-nix#antigravity-desktop
 
 ---
 
-## Notes
+## NixOS notes
 
-- The desktop app requires `--no-sandbox` (handled automatically) since NixOS does not set up the Chrome setuid sandbox by default.
-- Both packages are proprietary software (`allowUnfree = true` is set automatically within the flake).
-- The CLI binary is distributed by Google as `antigravity` but is exposed here as `agy` to avoid conflicting with the desktop app in `$PATH`.
+- **Login persistence**: use the NixOS module above. Without it, both `agy` and `antigravity` will forget your login on every restart (gnome-keyring needs to be unlocked via PAM).
+- **Sandbox**: `--no-sandbox` is applied automatically — Chrome's setuid sandbox requires root setup that NixOS doesn't do by default.
+- **Unfree**: `allowUnfree` is set inside the flake; you don't need to set it globally.
 
 ---
 
-## Versioning
+## Versions
 
 | Package | Version |
 |---|---|
-| Antigravity CLI | 1.0.0 |
+| Antigravity CLI (`agy`) | 1.0.0 |
 | Antigravity Desktop | 2.0.0 |
 
-Version bumps are tracked manually for now. PRs welcome.
+CLI updates are automated (daily). Desktop updates are manual for now — PRs welcome.
 
 ---
 
@@ -89,4 +124,4 @@ Version bumps are tracked manually for now. PRs welcome.
 
 MIT — see [LICENSE](./LICENSE).
 
-This flake is not affiliated with or endorsed by Google. Google Antigravity is proprietary software owned by Google LLC.
+Not affiliated with or endorsed by Google. Google Antigravity is proprietary software owned by Google LLC.

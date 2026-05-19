@@ -7,99 +7,101 @@
   };
 
   outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-          config.allowUnfree = true;
-        };
-
-        # ------------------------------------------------------------------ #
-        #  Antigravity CLI (agy) - v1.0.0                                     #
-        #  Go binary, glibc only, x86_64 + aarch64                            #
-        # ------------------------------------------------------------------ #
-        cliSrcs = {
-          x86_64-linux = {
-            url = "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.0.0-5288553236791296/linux-x64/cli_linux_x64.tar.gz";
-            hash = "sha256-cAljQFdPr8SgbE08gFcxTiLUdc4cgg0K1R/wf7fpnrY=";
+    let
+      # ------------------------------------------------------------------ #
+      #  Per-system packages                                                 #
+      # ------------------------------------------------------------------ #
+      perSystem = flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
           };
-          aarch64-linux = {
-            url = "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.0.0-5288553236791296/linux-arm/cli_linux_arm64.tar.gz";
-            hash = "sha256-9Nx8lsGDawB2jYpuxurMeFHzQkvW9Ovk2LhIplIHKoU=";
+
+          # -------------------------------------------------------------- #
+          #  Antigravity CLI (agy) - v1.0.0                                 #
+          #  Go binary, glibc only, x86_64 + aarch64                        #
+          # -------------------------------------------------------------- #
+          cliSrcs = {
+            x86_64-linux = {
+              url = "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.0.0-5288553236791296/linux-x64/cli_linux_x64.tar.gz";
+              hash = "sha256-cAljQFdPr8SgbE08gFcxTiLUdc4cgg0K1R/wf7fpnrY=";
+            };
+            aarch64-linux = {
+              url = "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.0.0-5288553236791296/linux-arm/cli_linux_arm64.tar.gz";
+              hash = "sha256-9Nx8lsGDawB2jYpuxurMeFHzQkvW9Ovk2LhIplIHKoU=";
+            };
           };
-        };
 
-        antigravity-cli = pkgs.stdenv.mkDerivation {
-          pname = "antigravity-cli";
-          version = "1.0.0";
+          antigravity-cli = pkgs.stdenv.mkDerivation {
+            pname = "antigravity-cli";
+            version = "1.0.0";
 
-          src = pkgs.fetchurl cliSrcs.${system};
+            src = pkgs.fetchurl cliSrcs.${system};
 
-          nativeBuildInputs = [ pkgs.autoPatchelfHook ];
-          buildInputs = [ pkgs.glibc ];
+            nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+            buildInputs = [ pkgs.glibc ];
 
-          dontUnpack = true;
+            dontUnpack = true;
 
-          installPhase = ''
-            runHook preInstall
-            mkdir -p $out/bin
-            tar -xzf $src
-            install -Dm755 antigravity $out/bin/agy
-            runHook postInstall
-          '';
+            installPhase = ''
+              runHook preInstall
+              mkdir -p $out/bin
+              tar -xzf $src
+              install -Dm755 antigravity $out/bin/agy
+              runHook postInstall
+            '';
 
-          meta = with pkgs.lib; {
-            description = "Google Antigravity CLI - terminal-first AI coding agent";
-            homepage = "https://antigravity.google";
-            license = licenses.unfree;
-            platforms = [ "x86_64-linux" "aarch64-linux" ];
-            mainProgram = "agy";
+            meta = with pkgs.lib; {
+              description = "Google Antigravity CLI - terminal-first AI coding agent";
+              homepage = "https://antigravity.google";
+              license = licenses.unfree;
+              platforms = [ "x86_64-linux" "aarch64-linux" ];
+              mainProgram = "agy";
+            };
           };
-        };
 
-        # ------------------------------------------------------------------ #
-        #  Antigravity 2.0 Desktop App - v2.0.0                               #
-        #  Electron app, x86_64 only for now (arm64 not yet released)         #
-        # ------------------------------------------------------------------ #
-        antigravity-desktop =
-          if system != "x86_64-linux"
-          then throw "antigravity-desktop is only available for x86_64-linux (arm64 not yet released by Google)"
-          else
-            let
-              libs = with pkgs; [
-                alsa-lib
-                at-spi2-atk
-                at-spi2-core
-                atk
-                cairo
-                cups
-                dbus
-                expat
-                gdk-pixbuf
-                glib
-                gsettings-desktop-schemas
-                gtk3
-                libdrm
-                libgbm
-                libGL
-                libglvnd
-                libxkbcommon
-                mesa
-                nss
-                nspr
-                pango
-                systemd
-                libx11
-                libxcomposite
-                libxdamage
-                libxext
-                libxfixes
-                libxrandr
-                libxcb
-                libxshmfence
-              ];
-            in
-            pkgs.stdenv.mkDerivation {
+          # -------------------------------------------------------------- #
+          #  Antigravity 2.0 Desktop App - v2.0.0                           #
+          #  Electron app, x86_64 only for now (arm64 not yet released)     #
+          # -------------------------------------------------------------- #
+          desktopLibs = with pkgs; [
+            alsa-lib
+            at-spi2-atk
+            at-spi2-core
+            atk
+            cairo
+            cups
+            dbus
+            expat
+            gdk-pixbuf
+            glib
+            gsettings-desktop-schemas
+            gtk3
+            libdrm
+            libgbm
+            libGL
+            libglvnd
+            libxkbcommon
+            mesa
+            nss
+            nspr
+            pango
+            systemd
+            libx11
+            libxcomposite
+            libxdamage
+            libxext
+            libxfixes
+            libxrandr
+            libxcb
+            libxshmfence
+          ];
+
+          antigravity-desktop =
+            if system != "x86_64-linux"
+            then throw "antigravity-desktop is only available for x86_64-linux (arm64 not yet released by Google)"
+            else pkgs.stdenv.mkDerivation {
               pname = "antigravity-desktop";
               version = "2.0.0";
 
@@ -111,7 +113,7 @@
               sourceRoot = "Antigravity-x64";
 
               nativeBuildInputs = [ pkgs.autoPatchelfHook pkgs.makeWrapper ];
-              buildInputs = libs;
+              buildInputs = desktopLibs;
 
               installPhase = ''
                 runHook preInstall
@@ -121,7 +123,8 @@
                 mkdir -p $out/bin
                 makeWrapper $out/share/antigravity/antigravity $out/bin/antigravity \
                   --add-flags "--no-sandbox" \
-                  --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath libs} \
+                  --add-flags "--password-store=basic" \
+                  --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath desktopLibs} \
                   --prefix XDG_DATA_DIRS : "${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}" \
                   --prefix XDG_DATA_DIRS : "${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}"
 
@@ -148,15 +151,85 @@
               };
             };
 
-      in
-      {
-        packages = {
-          inherit antigravity-cli;
-          antigravity-desktop =
-            if system == "x86_64-linux" then antigravity-desktop
-            else pkgs.lib.warn "antigravity-desktop not available for ${system}" null;
-          default = antigravity-cli;
+        in
+        {
+          packages = {
+            inherit antigravity-cli;
+            antigravity-desktop =
+              if system == "x86_64-linux" then antigravity-desktop
+              else null;
+            default = antigravity-cli;
+          };
+        }
+      );
+
+    in
+    perSystem // {
+
+      # ------------------------------------------------------------------ #
+      #  Overlay — drop antigravity-cli / antigravity-desktop into pkgs     #
+      # ------------------------------------------------------------------ #
+      overlays.default = final: _prev: {
+        antigravity-cli =
+          self.packages.${final.system}.antigravity-cli;
+        antigravity-desktop =
+          if final.system == "x86_64-linux"
+          then self.packages.${final.system}.antigravity-desktop
+          else null;
+      };
+
+      # ------------------------------------------------------------------ #
+      #  Home Manager module                                                 #
+      # ------------------------------------------------------------------ #
+      homeManagerModules.default = { config, lib, pkgs, ... }:
+        let cfg = config.programs.antigravity;
+        in {
+          options.programs.antigravity = {
+            enable = lib.mkEnableOption "Google Antigravity 2.0";
+            cli.enable = lib.mkOption {
+              type = lib.types.bool;
+              default = true;
+              description = "Install the agy CLI tool.";
+            };
+            desktop.enable = lib.mkOption {
+              type = lib.types.bool;
+              default = pkgs.stdenv.hostPlatform.system == "x86_64-linux";
+              description = "Install the Antigravity 2.0 desktop app (x86_64 only).";
+            };
+          };
+
+          config = lib.mkIf cfg.enable {
+            home.packages =
+              lib.optionals cfg.cli.enable [
+                self.packages.${pkgs.stdenv.hostPlatform.system}.antigravity-cli
+              ]
+              ++ lib.optionals (cfg.desktop.enable && pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
+                self.packages.${pkgs.stdenv.hostPlatform.system}.antigravity-desktop
+              ];
+          };
         };
-      }
-    );
+
+      # ------------------------------------------------------------------ #
+      #  NixOS module — keyring setup for session persistence               #
+      # ------------------------------------------------------------------ #
+      nixosModules.default = { config, lib, ... }:
+        let cfg = config.programs.antigravity;
+        in {
+          options.programs.antigravity = {
+            enable = lib.mkEnableOption "Google Antigravity 2.0 keyring support";
+            displayManager = lib.mkOption {
+              type = lib.types.str;
+              default = "lightdm";
+              description = "PAM display manager service to enable gnome-keyring on (e.g. lightdm, gdm, sddm).";
+            };
+          };
+
+          config = lib.mkIf cfg.enable {
+            services.gnome.gnome-keyring.enable = true;
+            security.pam.services.${cfg.displayManager}.enableGnomeKeyring = lib.mkDefault true;
+            security.pam.services.login.enableGnomeKeyring = lib.mkDefault true;
+          };
+        };
+
+    };
 }
