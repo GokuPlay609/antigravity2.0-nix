@@ -77,6 +77,7 @@
                 expat
                 gdk-pixbuf
                 glib
+                gsettings-desktop-schemas
                 gtk3
                 libdrm
                 libgbm
@@ -120,7 +121,9 @@
                 mkdir -p $out/bin
                 makeWrapper $out/share/antigravity/antigravity $out/bin/antigravity \
                   --add-flags "--no-sandbox" \
-                  --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath libs}
+                  --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath libs} \
+                  --prefix XDG_DATA_DIRS : "${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}" \
+                  --prefix XDG_DATA_DIRS : "${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}"
 
                 mkdir -p $out/share/applications
                 cat > $out/share/applications/antigravity.desktop << EOF
