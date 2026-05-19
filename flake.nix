@@ -101,55 +101,56 @@
           antigravity-desktop =
             if system != "x86_64-linux"
             then throw "antigravity-desktop is only available for x86_64-linux (arm64 not yet released by Google)"
-            else pkgs.stdenv.mkDerivation {
-              pname = "antigravity-desktop";
-              version = "2.0.0";
+            else pkgs.lib.makeOverridable ({ passwordStore ? "basic" }:
+              pkgs.stdenv.mkDerivation {
+                pname = "antigravity-desktop";
+                version = "2.0.0";
 
-              src = pkgs.fetchurl {
-                url = "https://storage.googleapis.com/antigravity-public/antigravity-hub/2.0.0-6324554176528384/linux-x64/Antigravity.tar.gz";
-                hash = "sha256-FLyctIClvo+zt9w+Kwzr+mbTcK1YzB4PoBFA0SBNQpc=";
-              };
+                src = pkgs.fetchurl {
+                  url = "https://storage.googleapis.com/antigravity-public/antigravity-hub/2.0.0-6324554176528384/linux-x64/Antigravity.tar.gz";
+                  hash = "sha256-FLyctIClvo+zt9w+Kwzr+mbTcK1YzB4PoBFA0SBNQpc=";
+                };
 
-              sourceRoot = "Antigravity-x64";
+                sourceRoot = "Antigravity-x64";
 
-              nativeBuildInputs = [ pkgs.autoPatchelfHook pkgs.makeWrapper ];
-              buildInputs = desktopLibs;
+                nativeBuildInputs = [ pkgs.autoPatchelfHook pkgs.makeWrapper ];
+                buildInputs = desktopLibs;
 
-              installPhase = ''
-                runHook preInstall
-                mkdir -p $out/share/antigravity
-                cp -r . $out/share/antigravity/
+                installPhase = ''
+                  runHook preInstall
+                  mkdir -p $out/share/antigravity
+                  cp -r . $out/share/antigravity/
 
-                mkdir -p $out/bin
-                makeWrapper $out/share/antigravity/antigravity $out/bin/antigravity \
-                  --add-flags "--no-sandbox" \
-                  --add-flags "--password-store=basic" \
-                  --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath desktopLibs} \
-                  --prefix XDG_DATA_DIRS : "${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}" \
-                  --prefix XDG_DATA_DIRS : "${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}"
+                  mkdir -p $out/bin
+                  makeWrapper $out/share/antigravity/antigravity $out/bin/antigravity \
+                    --add-flags "--no-sandbox" \
+                    ${pkgs.lib.optionalString (passwordStore != "") "--add-flags \"--password-store=${passwordStore}\""} \
+                    --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath desktopLibs} \
+                    --prefix XDG_DATA_DIRS : "${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}" \
+                    --prefix XDG_DATA_DIRS : "${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}"
 
-                mkdir -p $out/share/applications
-                cat > $out/share/applications/antigravity.desktop << EOF
-                [Desktop Entry]
-                Name=Antigravity
-                Comment=Google Antigravity 2.0 - Agent-first development platform
-                Exec=$out/bin/antigravity %U
-                Terminal=false
-                Type=Application
-                Categories=Development;
-                StartupWMClass=Antigravity
-                EOF
-                runHook postInstall
-              '';
+                  mkdir -p $out/share/applications
+                  cat > $out/share/applications/antigravity.desktop << EOF
+                  [Desktop Entry]
+                  Name=Antigravity
+                  Comment=Google Antigravity 2.0 - Agent-first development platform
+                  Exec=$out/bin/antigravity %U
+                  Terminal=false
+                  Type=Application
+                  Categories=Development;
+                  StartupWMClass=Antigravity
+                  EOF
+                  runHook postInstall
+                '';
 
-              meta = with pkgs.lib; {
-                description = "Google Antigravity 2.0 - agent-first development platform";
-                homepage = "https://antigravity.google";
-                license = licenses.unfree;
-                platforms = [ "x86_64-linux" ];
-                mainProgram = "antigravity";
-              };
-            };
+                meta = with pkgs.lib; {
+                  description = "Google Antigravity 2.0 - agent-first development platform";
+                  homepage = "https://antigravity.google";
+                  license = licenses.unfree;
+                  platforms = [ "x86_64-linux" ];
+                  mainProgram = "antigravity";
+                };
+              }) {};
 
         in
         {
@@ -196,6 +197,17 @@
               default = pkgs.stdenv.hostPlatform.system == "x86_64-linux";
               description = "Install the Antigravity 2.0 desktop app (x86_64 only).";
             };
+            desktop.passwordStore = lib.mkOption {
+              type = lib.types.enum [ "basic" "gnome-libsecret" "kwallet" "" ];
+              default = "basic";
+              description = ''
+                Electron password store backend.
+                - "basic": store credentials on disk (no keyring needed — recommended for non-GNOME setups and autologin).
+                - "gnome-libsecret": use gnome-keyring (requires a running, unlocked keyring daemon).
+                - "kwallet": use KDE Wallet.
+                - "": let Electron decide (default upstream behaviour).
+              '';
+            };
           };
 
           config = lib.mkIf cfg.enable {
@@ -204,7 +216,9 @@
                 self.packages.${pkgs.stdenv.hostPlatform.system}.antigravity-cli
               ]
               ++ lib.optionals (cfg.desktop.enable && pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
-                self.packages.${pkgs.stdenv.hostPlatform.system}.antigravity-desktop
+                (self.packages.${pkgs.stdenv.hostPlatform.system}.antigravity-desktop.override {
+                  inherit (cfg.desktop) passwordStore;
+                })
               ];
           };
         };
