@@ -74,6 +74,8 @@
             cups
             dbus
             expat
+            fontconfig
+            freetype
             gdk-pixbuf
             glib
             gsettings-desktop-schemas
@@ -82,18 +84,31 @@
             libgbm
             libGL
             libglvnd
+            libnotify
+            libpulseaudio
+            libsecret
+            libuuid
+            libxml2
             libxkbcommon
             mesa
-            nss
             nspr
+            nss
             pango
+            stdenv.cc.cc
             systemd
+            vulkan-loader
+            wayland
             libx11
             libxcomposite
+            libxcursor
             libxdamage
             libxext
             libxfixes
+            libxi
             libxrandr
+            libxrender
+            libxt
+            libxtst
             libxcb
             libxshmfence
           ];
@@ -135,6 +150,7 @@
                   makeWrapper $out/share/antigravity/antigravity $out/bin/antigravity \
                     --add-flags "--no-sandbox" \
                     ${pkgs.lib.optionalString (passwordStore != "") "--add-flags \"--password-store=${passwordStore}\""} \
+                    --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.xdg-utils ]} \
                     --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath desktopLibs} \
                     --prefix XDG_DATA_DIRS : "${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}" \
                     --prefix XDG_DATA_DIRS : "${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}"
