@@ -10,7 +10,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  update-cli:
+  update-packages:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,26 +19,45 @@ jobs:
           extra_nix_config: |
             accept-flake-config = true
 
-      - name: Fetch CLI manifests and compute hashes
+      - name: Fetch package manifests and compute hashes
         id: update
         run: |
           set -euo pipefail
-          MANIFEST_BASE="https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests"
+          CLI_MANIFEST_BASE="https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests"
 
-          M_X64=$(curl -fsSL "$MANIFEST_BASE/linux_amd64.json")
-          VERSION=$(echo "$M_X64" | jq -r '.version')
-          URL_X64=$(echo "$M_X64" | jq -r '.url')
-          HASH_X64=$(nix store prefetch-file --json "$URL_X64" 2>/dev/null | jq -r '.hash')
+          CLI_M_X64=$(curl -fsSL "$CLI_MANIFEST_BASE/linux_amd64.json")
+          CLI_VERSION=$(echo "$CLI_M_X64" | jq -r '.version')
+          CLI_URL_X64=$(echo "$CLI_M_X64" | jq -r '.url')
+          CLI_HASH_X64=$(nix store prefetch-file --json "$CLI_URL_X64" 2>/dev/null | jq -r '.hash')
 
-          M_ARM=$(curl -fsSL "$MANIFEST_BASE/linux_arm64.json")
-          URL_ARM=$(echo "$M_ARM" | jq -r '.url')
-          HASH_ARM=$(nix store prefetch-file --json "$URL_ARM" 2>/dev/null | jq -r '.hash')
+          CLI_M_ARM=$(curl -fsSL "$CLI_MANIFEST_BASE/linux_arm64.json")
+          CLI_URL_ARM=$(echo "$CLI_M_ARM" | jq -r '.url')
+          CLI_HASH_ARM=$(nix store prefetch-file --json "$CLI_URL_ARM" 2>/dev/null | jq -r '.hash')
 
-          echo "version=$VERSION"   >> "$GITHUB_OUTPUT"
-          echo "url_x64=$URL_X64"   >> "$GITHUB_OUTPUT"
-          echo "hash_x64=$HASH_X64" >> "$GITHUB_OUTPUT"
-          echo "url_arm=$URL_ARM"   >> "$GITHUB_OUTPUT"
-          echo "hash_arm=$HASH_ARM" >> "$GITHUB_OUTPUT"
+          DESKTOP_RELEASE=$(curl -fsSL "https://antigravity-auto-updater-974169037036.us-central1.run.app/releases" \
+            | jq -r '[.[] | select(.version | startswith("2."))][0]')
+          DESKTOP_VERSION=$(echo "$DESKTOP_RELEASE" | jq -r '.version')
+          DESKTOP_EXECUTION_ID=$(echo "$DESKTOP_RELEASE" | jq -r '.execution_id')
+          DESKTOP_BASE="https://storage.googleapis.com/antigravity-public/antigravity-hub/${DESKTOP_VERSION}-${DESKTOP_EXECUTION_ID}"
+
+          DESKTOP_M_X64=$(curl -fsSL "$DESKTOP_BASE/linux-x64/manifest.json")
+          DESKTOP_URL_X64=$(echo "$DESKTOP_M_X64" | jq -r '.url')
+          DESKTOP_HASH_X64=$(nix hash convert --hash-algo sha256 --from base16 --to sri "$(echo "$DESKTOP_M_X64" | jq -r '.sha256hash')")
+
+          DESKTOP_M_ARM=$(curl -fsSL "$DESKTOP_BASE/linux-arm/manifest.json")
+          DESKTOP_URL_ARM=$(echo "$DESKTOP_M_ARM" | jq -r '.url')
+          DESKTOP_HASH_ARM=$(nix hash convert --hash-algo sha256 --from base16 --to sri "$(echo "$DESKTOP_M_ARM" | jq -r '.sha256hash')")
+
+          echo "cli_version=$CLI_VERSION"             >> "$GITHUB_OUTPUT"
+          echo "cli_url_x64=$CLI_URL_X64"             >> "$GITHUB_OUTPUT"
+          echo "cli_hash_x64=$CLI_HASH_X64"           >> "$GITHUB_OUTPUT"
+          echo "cli_url_arm=$CLI_URL_ARM"             >> "$GITHUB_OUTPUT"
+          echo "cli_hash_arm=$CLI_HASH_ARM"           >> "$GITHUB_OUTPUT"
+          echo "desktop_version=$DESKTOP_VERSION"     >> "$GITHUB_OUTPUT"
+          echo "desktop_url_x64=$DESKTOP_URL_X64"     >> "$GITHUB_OUTPUT"
+          echo "desktop_hash_x64=$DESKTOP_HASH_X64"   >> "$GITHUB_OUTPUT"
+          echo "desktop_url_arm=$DESKTOP_URL_ARM"     >> "$GITHUB_OUTPUT"
+          echo "desktop_hash_arm=$DESKTOP_HASH_ARM"   >> "$GITHUB_OUTPUT"
 
       - name: Patch flake.nix
         run: |
@@ -50,45 +69,69 @@ jobs:
           flake = Path("flake.nix")
           content = flake.read_text()
 
-          version  = os.environ["VERSION"]
-          url_x64  = os.environ["URL_X64"]
-          hash_x64 = os.environ["HASH_X64"]
-          url_arm  = os.environ["URL_ARM"]
-          hash_arm = os.environ["HASH_ARM"]
+          cli_version  = os.environ["CLI_VERSION"]
+          cli_url_x64  = os.environ["CLI_URL_X64"]
+          cli_hash_x64 = os.environ["CLI_HASH_X64"]
+          cli_url_arm  = os.environ["CLI_URL_ARM"]
+          cli_hash_arm = os.environ["CLI_HASH_ARM"]
+          desktop_version  = os.environ["DESKTOP_VERSION"]
+          desktop_url_x64  = os.environ["DESKTOP_URL_X64"]
+          desktop_hash_x64 = os.environ["DESKTOP_HASH_X64"]
+          desktop_url_arm  = os.environ["DESKTOP_URL_ARM"]
+          desktop_hash_arm = os.environ["DESKTOP_HASH_ARM"]
 
           content, version_count = re.subn(
               r'(pname = "antigravity-cli";\s+version = ")[^"]+(")',
-              rf'\g<1>{version}\2', content)
+              rf'\g<1>{cli_version}\2', content)
           if version_count != 1:
               raise SystemExit(f"expected to update exactly one CLI version, updated {version_count}")
 
-          # Only patch cliSrcs. The flake also contains desktopSrcs blocks with
-          # the same architecture keys, so repo-wide substitutions can corrupt
-          # the desktop package by replacing its URLs/hashes with CLI values.
-          start = content.index("          cliSrcs = {")
-          end = content.index("\n          };\n\n          antigravity-cli", start)
-          cli_srcs = content[start:end]
+          content, version_count = re.subn(
+              r'(pname = "antigravity-desktop";\s+version = ")[^"]+(")',
+              rf'\g<1>{desktop_version}\2', content)
+          if version_count != 1:
+              raise SystemExit(f"expected to update exactly one desktop version, updated {version_count}")
 
-          def patch_arch(srcs, arch, url, sha256):
+          def patch_sources(source_name, package_name, next_marker, replacements):
+              start = content.index(f"          {source_name} = {{")
+              end = content.index(next_marker, start)
+              srcs = content[start:end]
+
+              for arch, url, sha256 in replacements:
+                  srcs = patch_arch(srcs, arch, url, sha256, package_name)
+
+              return content[:start] + srcs + content[end:]
+
+          def patch_arch(srcs, arch, url, sha256, package_name):
               pattern = rf'({arch} = \{{\s+url = ")[^"]+(";\s+hash = ")[^"]+(")'
               updated, count = re.subn(pattern, rf'\g<1>{url}\2{sha256}\3', srcs)
               if count != 1:
-                  raise SystemExit(f"expected to update exactly one {arch} CLI source, updated {count}")
+                  raise SystemExit(f"expected to update exactly one {arch} {package_name} source, updated {count}")
               return updated
 
-          cli_srcs = patch_arch(cli_srcs, "x86_64-linux", url_x64, hash_x64)
-          cli_srcs = patch_arch(cli_srcs, "aarch64-linux", url_arm, hash_arm)
-          content = content[:start] + cli_srcs + content[end:]
+          content = patch_sources("cliSrcs", "CLI", "\n          };\n\n          antigravity-cli", [
+              ("x86_64-linux", cli_url_x64, cli_hash_x64),
+              ("aarch64-linux", cli_url_arm, cli_hash_arm),
+          ])
+          content = patch_sources("desktopSrcs", "desktop", "\n          };\n\n          antigravity-desktop", [
+              ("x86_64-linux", desktop_url_x64, desktop_hash_x64),
+              ("aarch64-linux", desktop_url_arm, desktop_hash_arm),
+          ])
 
           flake.write_text(content)
-          print(f"Updated CLI to {version}")
+          print(f"Updated CLI to {cli_version} and desktop to {desktop_version}")
           EOF
         env:
-          VERSION:  ${{ steps.update.outputs.version }}
-          URL_X64:  ${{ steps.update.outputs.url_x64 }}
-          HASH_X64: ${{ steps.update.outputs.hash_x64 }}
-          URL_ARM:  ${{ steps.update.outputs.url_arm }}
-          HASH_ARM: ${{ steps.update.outputs.hash_arm }}
+          CLI_VERSION:     ${{ steps.update.outputs.cli_version }}
+          CLI_URL_X64:     ${{ steps.update.outputs.cli_url_x64 }}
+          CLI_HASH_X64:    ${{ steps.update.outputs.cli_hash_x64 }}
+          CLI_URL_ARM:     ${{ steps.update.outputs.cli_url_arm }}
+          CLI_HASH_ARM:    ${{ steps.update.outputs.cli_hash_arm }}
+          DESKTOP_VERSION:  ${{ steps.update.outputs.desktop_version }}
+          DESKTOP_URL_X64:  ${{ steps.update.outputs.desktop_url_x64 }}
+          DESKTOP_HASH_X64: ${{ steps.update.outputs.desktop_hash_x64 }}
+          DESKTOP_URL_ARM:  ${{ steps.update.outputs.desktop_url_arm }}
+          DESKTOP_HASH_ARM: ${{ steps.update.outputs.desktop_hash_arm }}
 
       - name: Update flake.lock
         run: nix flake update
@@ -96,15 +139,18 @@ jobs:
       - name: Open PR if anything changed
         uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: "chore: update antigravity-cli to ${{ steps.update.outputs.version }}"
-          title: "chore: update antigravity-cli to ${{ steps.update.outputs.version }}"
+          commit-message: "chore: update Antigravity packages"
+          title: "chore: update Antigravity packages"
           body: |
-            Automated version bump for `antigravity-cli`.
+            Automated version bump for Antigravity packages.
 
             | | Value |
             |---|---|
-            | **Version** | `${{ steps.update.outputs.version }}` |
-            | **x86_64 URL** | `${{ steps.update.outputs.url_x64 }}` |
-            | **aarch64 URL** | `${{ steps.update.outputs.url_arm }}` |
-          branch: "auto-update/cli-${{ steps.update.outputs.version }}"
+            | **CLI version** | `${{ steps.update.outputs.cli_version }}` |
+            | **CLI x86_64 URL** | `${{ steps.update.outputs.cli_url_x64 }}` |
+            | **CLI aarch64 URL** | `${{ steps.update.outputs.cli_url_arm }}` |
+            | **Desktop version** | `${{ steps.update.outputs.desktop_version }}` |
+            | **Desktop x86_64 URL** | `${{ steps.update.outputs.desktop_url_x64 }}` |
+            | **Desktop aarch64 URL** | `${{ steps.update.outputs.desktop_url_arm }}` |
+          branch: "auto-update/packages"
           delete-branch: true

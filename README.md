@@ -2,15 +2,15 @@
 
 [![CI](https://github.com/GokuPlay609/antigravity2.0-nix/actions/workflows/ci.yml/badge.svg)](https://github.com/GokuPlay609/antigravity2.0-nix/actions/workflows/ci.yml)
 [![Auto-update](https://github.com/GokuPlay609/antigravity2.0-nix/actions/workflows/update.yml/badge.svg)](https://github.com/GokuPlay609/antigravity2.0-nix/actions/workflows/update.yml)
-![CLI version](https://img.shields.io/badge/agy-1.0.0-blue)
-![Desktop version](https://img.shields.io/badge/antigravity-2.0.0-blue)
+![CLI version](https://img.shields.io/badge/agy-1.0.2-blue)
+![Desktop version](https://img.shields.io/badge/antigravity-2.0.1-blue)
 ![License](https://img.shields.io/github/license/GokuPlay609/antigravity2.0-nix)
 
 Nix flake for **Google Antigravity 2.0** — the agent-first development platform announced at Google I/O 2026.
 
 Packages both the **desktop app** and the **CLI** (`agy`), which are not available in nixpkgs (the existing `antigravity` package in nixpkgs is the old v1.x IDE, which is a completely different product).
 
-> The CLI auto-updates daily via GitHub Actions.
+> The CLI and desktop packages auto-update daily via GitHub Actions.
 
 ---
 
@@ -112,10 +112,10 @@ nix profile install github:GokuPlay609/antigravity2.0-nix#antigravity-desktop
 
 | Package | Version |
 |---|---|
-| Antigravity CLI (`agy`) | 1.0.0 |
-| Antigravity Desktop | 2.0.0 |
+| Antigravity CLI (`agy`) | 1.0.2 |
+| Antigravity Desktop | 2.0.1 |
 
-CLI updates are automated (daily). Desktop updates are manual for now — PRs welcome.
+CLI and desktop updates are automated daily.
 
 ---
 
