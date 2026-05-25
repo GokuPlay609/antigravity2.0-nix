@@ -1,10 +1,10 @@
 # antigravity2.0-nix
 
-[![CI](https://github.com/briossant/antigravity2.0-nix/actions/workflows/ci.yml/badge.svg)](https://github.com/briossant/antigravity2.0-nix/actions/workflows/ci.yml)
-[![Auto-update](https://github.com/briossant/antigravity2.0-nix/actions/workflows/update.yml/badge.svg)](https://github.com/briossant/antigravity2.0-nix/actions/workflows/update.yml)
+[![CI](https://github.com/GokuPlay609/antigravity2.0-nix/actions/workflows/ci.yml/badge.svg)](https://github.com/GokuPlay609/antigravity2.0-nix/actions/workflows/ci.yml)
+[![Auto-update](https://github.com/GokuPlay609/antigravity2.0-nix/actions/workflows/update.yml/badge.svg)](https://github.com/GokuPlay609/antigravity2.0-nix/actions/workflows/update.yml)
 ![CLI version](https://img.shields.io/badge/agy-1.0.0-blue)
 ![Desktop version](https://img.shields.io/badge/antigravity-2.0.0-blue)
-![License](https://img.shields.io/github/license/briossant/antigravity2.0-nix)
+![License](https://img.shields.io/github/license/GokuPlay609/antigravity2.0-nix)
 
 Nix flake for **Google Antigravity 2.0** — the agent-first development platform announced at Google I/O 2026.
 
@@ -30,8 +30,8 @@ Packages both the **desktop app** and the **CLI** (`agy`), which are not availab
 ### Quick try (no install)
 
 ```bash
-nix run github:briossant/antigravity2.0-nix#antigravity-cli
-nix run github:briossant/antigravity2.0-nix#antigravity-desktop
+nix run github:GokuPlay609/antigravity2.0-nix#antigravity-cli
+nix run github:GokuPlay609/antigravity2.0-nix#antigravity-desktop
 ```
 
 ### Flake input
@@ -39,7 +39,7 @@ nix run github:briossant/antigravity2.0-nix#antigravity-desktop
 ```nix
 # flake.nix
 inputs = {
-  antigravity2.url = "github:briossant/antigravity2.0-nix";
+  antigravity2.url = "github:GokuPlay609/antigravity2.0-nix";
   antigravity2.inputs.nixpkgs.follows = "nixpkgs";
 };
 ```
@@ -50,7 +50,7 @@ The easiest way to install both tools declaratively:
 
 ```nix
 # flake.nix
-inputs.antigravity2.url = "github:briossant/antigravity2.0-nix";
+inputs.antigravity2.url = "github:GokuPlay609/antigravity2.0-nix";
 
 # home-manager config
 { inputs, ... }: {
@@ -70,7 +70,7 @@ Handles gnome-keyring setup so both tools remember your login across sessions:
 
 ```nix
 # flake.nix
-inputs.antigravity2.url = "github:briossant/antigravity2.0-nix";
+inputs.antigravity2.url = "github:GokuPlay609/antigravity2.0-nix";
 
 # NixOS config
 { inputs, ... }: {
@@ -94,8 +94,8 @@ nixpkgs.overlays = [ inputs.antigravity2.overlays.default ];
 ### nix profile (imperative)
 
 ```bash
-nix profile install github:briossant/antigravity2.0-nix#antigravity-cli
-nix profile install github:briossant/antigravity2.0-nix#antigravity-desktop
+nix profile install github:GokuPlay609/antigravity2.0-nix#antigravity-cli
+nix profile install github:GokuPlay609/antigravity2.0-nix#antigravity-desktop
 ```
 
 ---

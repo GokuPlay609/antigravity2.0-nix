@@ -43,10 +43,12 @@ jobs:
       - name: Patch flake.nix
         run: |
           python3 - <<'EOF'
-          import re, os
+          import os
+          import re
+          from pathlib import Path
 
-          with open("flake.nix") as f:
-              content = f.read()
+          flake = Path("flake.nix")
+          content = flake.read_text()
 
           version  = os.environ["VERSION"]
           url_x64  = os.environ["URL_X64"]
@@ -54,18 +56,31 @@ jobs:
           url_arm  = os.environ["URL_ARM"]
           hash_arm = os.environ["HASH_ARM"]
 
-          content = re.sub(
+          content, version_count = re.subn(
               r'(pname = "antigravity-cli";\s+version = ")[^"]+(")',
               rf'\g<1>{version}\2', content)
-          content = re.sub(
-              r'(x86_64-linux = \{\s+url = ")[^"]+(";\s+hash = ")[^"]+(")',
-              rf'\g<1>{url_x64}\2{hash_x64}\3', content)
-          content = re.sub(
-              r'(aarch64-linux = \{\s+url = ")[^"]+(";\s+hash = ")[^"]+(")',
-              rf'\g<1>{url_arm}\2{hash_arm}\3', content)
+          if version_count != 1:
+              raise SystemExit(f"expected to update exactly one CLI version, updated {version_count}")
 
-          with open("flake.nix", "w") as f:
-              f.write(content)
+          # Only patch cliSrcs. The flake also contains desktopSrcs blocks with
+          # the same architecture keys, so repo-wide substitutions can corrupt
+          # the desktop package by replacing its URLs/hashes with CLI values.
+          start = content.index("          cliSrcs = {")
+          end = content.index("\n          };\n\n          antigravity-cli", start)
+          cli_srcs = content[start:end]
+
+          def patch_arch(srcs, arch, url, sha256):
+              pattern = rf'({arch} = \{{\s+url = ")[^"]+(";\s+hash = ")[^"]+(")'
+              updated, count = re.subn(pattern, rf'\g<1>{url}\2{sha256}\3', srcs)
+              if count != 1:
+                  raise SystemExit(f"expected to update exactly one {arch} CLI source, updated {count}")
+              return updated
+
+          cli_srcs = patch_arch(cli_srcs, "x86_64-linux", url_x64, hash_x64)
+          cli_srcs = patch_arch(cli_srcs, "aarch64-linux", url_arm, hash_arm)
+          content = content[:start] + cli_srcs + content[end:]
+
+          flake.write_text(content)
           print(f"Updated CLI to {version}")
           EOF
         env:
