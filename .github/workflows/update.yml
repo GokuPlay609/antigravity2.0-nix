@@ -137,6 +137,7 @@ jobs:
         run: nix flake update
 
       - name: Open PR if anything changed
+        id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
           commit-message: "chore: update Antigravity packages"
@@ -154,3 +155,9 @@ jobs:
             | **Desktop aarch64 URL** | `${{ steps.update.outputs.desktop_url_arm }}` |
           branch: "auto-update/packages"
           delete-branch: true
+
+      - name: Enable Pull Request Automerge
+        if: steps.cpr.outputs.pull-request-operation == 'created'
+        run: gh pr merge --auto --squash "${{ steps.cpr.outputs.pull-request-number }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
