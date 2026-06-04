@@ -24,18 +24,18 @@
           # -------------------------------------------------------------- #
           cliSrcs = {
             x86_64-linux = {
-              url = "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.0.4-6410134369468416/linux-x64/cli_linux_x64.tar.gz";
-              hash = "sha256-5jkJrnF6zqoKSC3gU8I4Nud7WuV7Iu5tRF6YM/Hkp70=";
+              url = "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.0.5-5009297080451072/linux-x64/cli_linux_x64.tar.gz";
+              hash = "sha256-IQHDH7wzGJmZ9EwIq9LfSTfQAuePzlqS5x8NCiSP3Mw=";
             };
             aarch64-linux = {
-              url = "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.0.4-6410134369468416/linux-arm/cli_linux_arm64.tar.gz";
-              hash = "sha256-8ia1labGQ+WLSc/v1fnXDZ85XWTw0QK/M3lFjkgcO14=";
+              url = "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.0.5-5009297080451072/linux-arm/cli_linux_arm64.tar.gz";
+              hash = "sha256-t6NxoSa43gLDco/nNvvryHJypRRMdkdHZXK1B8MmTso=";
             };
           };
 
           antigravity-cli = pkgs.stdenv.mkDerivation {
             pname = "antigravity-cli";
-            version = "1.0.4";
+            version = "1.0.5";
 
             src = pkgs.fetchurl cliSrcs.${system};
 
