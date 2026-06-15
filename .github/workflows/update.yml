@@ -18,6 +18,7 @@ jobs:
         with:
           extra_nix_config: |
             accept-flake-config = true
+      - uses: astral-sh/setup-uv@v3
 
       - name: Fetch package manifests and compute hashes
         id: update
@@ -34,11 +35,32 @@ jobs:
           CLI_URL_ARM=$(echo "$CLI_M_ARM" | jq -r '.url')
           CLI_HASH_ARM=$(nix store prefetch-file --json "$CLI_URL_ARM" 2>/dev/null | jq -r '.hash')
 
-          DESKTOP_RELEASE=$(curl -fsSL "https://antigravity-auto-updater-974169037036.us-central1.run.app/releases" \
-            | jq -r '[.[] | select(.version | startswith("2."))][0]')
-          DESKTOP_VERSION=$(echo "$DESKTOP_RELEASE" | jq -r '.version')
-          DESKTOP_EXECUTION_ID=$(echo "$DESKTOP_RELEASE" | jq -r '.execution_id')
-          DESKTOP_BASE="https://storage.googleapis.com/antigravity-public/antigravity-hub/${DESKTOP_VERSION}-${DESKTOP_EXECUTION_ID}"
+          # The /releases endpoint only advertises the original 2.0.0 build, so it
+          # never reports newer releases even though they exist in GCS. List the
+          # bucket directly and pick the highest semver, skipping the bogus
+          # 100.0.0 ghost build that lives alongside the real ones (we cap the
+          # major version at 50 so a real major bump like 3.x still goes through).
+          GCS_API="https://storage.googleapis.com/storage/v1/b/antigravity-public/o"
+          LATEST=$(curl -fsSL "$GCS_API?prefix=antigravity-hub%2F&delimiter=%2F" \
+            | jq -r '.prefixes[]' \
+            | uv run --quiet --no-project python -c '
+          import sys, re
+          candidates = []
+          for line in sys.stdin:
+              line = line.strip().rstrip("/")
+              m = re.match(r"antigravity-hub/(\d+)\.(\d+)\.(\d+)-\d+$", line)
+              if not m:
+                  continue
+              major, minor, patch = (int(g) for g in m.groups())
+              if major >= 50:  # skip the 100.0.0 ghost build
+                  continue
+              candidates.append(((major, minor, patch), line))
+          if not candidates:
+              raise SystemExit("no desktop builds found")
+          print(max(candidates)[1])
+          ')
+          DESKTOP_VERSION=$(echo "$LATEST" | sed -E 's|antigravity-hub/([0-9]+\.[0-9]+\.[0-9]+)-.*|\1|')
+          DESKTOP_BASE="https://storage.googleapis.com/antigravity-public/$LATEST"
 
           DESKTOP_M_X64=$(curl -fsSL "$DESKTOP_BASE/linux-x64/manifest.json")
           DESKTOP_URL_X64=$(echo "$DESKTOP_M_X64" | jq -r '.url')
@@ -61,7 +83,7 @@ jobs:
 
       - name: Patch flake.nix
         run: |
-          python3 - <<'EOF'
+          uv run --quiet --no-project python - <<'EOF'
           import os
           import re
           from pathlib import Path
